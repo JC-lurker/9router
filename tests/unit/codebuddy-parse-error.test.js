@@ -35,7 +35,7 @@ describe("CodeBuddy parseError", () => {
     expect(parsed.resetsAtMs).toBe(expected);
   });
 
-  it("falls back to super.parseError for unrelated errors", () => {
+  it("surfaces an unrelated structured error with its code instead of the raw blob", () => {
     const executor = new CodeBuddyExecutor();
     const bodyText = JSON.stringify({
       code: 11101,
@@ -44,7 +44,7 @@ describe("CodeBuddy parseError", () => {
 
     const parsed = executor.parseError({ status: 400 }, bodyText);
     expect(parsed.status).toBe(400);
-    expect(parsed.message).toBe(bodyText);
+    expect(parsed.message).toBe("[11101] Non-stream chat request is currently not supported");
     expect(parsed.resetsAtMs).toBeUndefined();
   });
 });
