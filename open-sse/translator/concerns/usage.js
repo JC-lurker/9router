@@ -61,7 +61,14 @@ const USAGE_EXTRACTORS = {
   commandcode(raw) {
     const input = n(raw.inputTokens), output = n(raw.outputTokens);
     const total = typeof raw.totalTokens === "number" ? raw.totalTokens : input + output;
-    return { promptTokens: input, completionTokens: output, totalTokens: total };
+    const cacheRead = n(raw.inputTokenDetails?.cacheReadTokens) || n(raw.inputTokenDetails?.cachedTokens) || n(raw.input_tokens_details?.cached_tokens);
+    const cacheWrite = n(raw.inputTokenDetails?.cacheWriteTokens) || n(raw.input_tokens_details?.cache_creation_tokens);
+    const reasoning = n(raw.outputTokenDetails?.reasoningTokens) || n(raw.output_tokens_details?.reasoning_tokens);
+    const out = { promptTokens: input, completionTokens: output, totalTokens: total };
+    if (cacheRead > 0) out.cachedTokens = cacheRead;
+    if (cacheWrite > 0) out.cacheCreationTokens = cacheWrite;
+    if (reasoning > 0) out.reasoningTokens = reasoning;
+    return out;
   },
 };
 

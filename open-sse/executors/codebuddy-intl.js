@@ -1,4 +1,25 @@
+import { createHash, randomUUID } from "node:crypto";
 import { DefaultExecutor } from "./default.js";
+import { parseCodeBuddyError } from "./codebuddyError.js";
+
+// RFC-4122-v5-shaped UUID derived from a key, so one conversation keeps one id.
+function stableUuidFrom(key) {
+  const h = createHash("sha1").update(key).digest("hex");
+  const timeHigh = ((parseInt(h.slice(12, 16), 16) & 0x0fff) | 0x5000).toString(16).padStart(4, "0");
+  const clockSeq = ((parseInt(h.slice(16, 20), 16) & 0x3fff) | 0x8000).toString(16).padStart(4, "0");
+  return [h.slice(0, 8), h.slice(8, 12), timeHigh, clockSeq, h.slice(20, 32)].join("-");
+}
+
+// Conversation key: explicit session id, else the opening user message.
+function conversationKey(body) {
+  const explicit = [body?.session_id, body?.prompt_cache_key, body?.conversation_id].find((v) => typeof v === "string" && v);
+  if (explicit) return explicit;
+  const first = Array.isArray(body?.messages) ? body.messages.find((m) => m?.role === "user") : null;
+  const text = typeof first?.content === "string"
+    ? first.content
+    : Array.isArray(first?.content) ? first.content.map((b) => b?.text || "").join("\n") : "";
+  return text ? `cbai:${text}` : null;
+}
 
 /**
  * CodeBuddyIntlExecutor — talks to https://www.codebuddy.ai/v2/chat/completions
@@ -11,6 +32,21 @@ import { DefaultExecutor } from "./default.js";
 export class CodeBuddyIntlExecutor extends DefaultExecutor {
   constructor() {
     super("codebuddy-intl");
+  }
+
+  // www.codebuddy.ai rejects chat requests without the X-Conversation-* family
+  // the official client sends (HTTP 400 code 11128 "conversation id missing" /
+  // "channel verification"). All three headers are required; any two still 400.
+  // copilot.tencent.com (codebuddy-cn) is not gated.
+  buildHeaders(credentials, stream = true, url, model, body = null) {
+    const headers = super.buildHeaders(credentials, stream, url, model, body);
+    const key = conversationKey(body);
+    const messageId = randomUUID();
+    headers["X-Conversation-ID"] = key ? stableUuidFrom(key) : randomUUID();
+    headers["X-Conversation-Request-ID"] = randomUUID();
+    headers["X-Conversation-Message-ID"] = messageId;
+    headers["X-Request-ID"] = messageId;
+    return headers;
   }
 
   transformRequest(model, body, stream, credentials) {
@@ -39,32 +75,9 @@ export class CodeBuddyIntlExecutor extends DefaultExecutor {
 
     return transformed;
   }
+  // Same structured error body as codebuddy-cn ({code, msg, displayMsg, ...}).
   parseError(response, bodyText) {
-    if (bodyText) {
-      try {
-        const data = JSON.parse(bodyText);
-        const msg = data?.msg || data?.message || data?.error?.message || "";
-        if (data?.code === 6004 || /超出频率限制|frequency limit|限额/i.test(msg)) {
-          let resetsAtMs = null;
-          const match = msg.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\s*UTC\+?([0-9:]+))?/i);
-          if (match) {
-            const dp = match[1];
-            const tp = match[2];
-            const tz = match[3]
-              ? (match[3].includes(":") ? (match[3].startsWith("+") ? match[3] : `+${match[3]}`) : `+${match[3].padStart(2, "0")}:00`)
-              : "+08:00";
-            const dt = new Date(`${dp}T${tp}${tz}`);
-            if (!isNaN(dt.getTime())) resetsAtMs = dt.getTime();
-          }
-          return {
-            status: 429,
-            message: msg || "CodeBuddy frequency limit (6004)",
-            resetsAtMs,
-          };
-        }
-      } catch {}
-    }
-    return super.parseError(response, bodyText);
+    return parseCodeBuddyError(response, bodyText) || super.parseError(response, bodyText);
   }
 }
 
