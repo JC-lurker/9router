@@ -75,6 +75,21 @@ describe("toOpenAIUsage", () => {
     expect(u.total_tokens).toBe(99);
   });
 
+  it("commandcode: passes through cache and reasoning details when present", () => {
+    const u = toOpenAIUsage({
+      inputTokens: 100,
+      outputTokens: 20,
+      inputTokenDetails: { cacheReadTokens: 80, cacheWriteTokens: 10 },
+      outputTokenDetails: { reasoningTokens: 5 }
+    }, "commandcode");
+    expect(u.prompt_tokens).toBe(100);
+    expect(u.completion_tokens).toBe(20);
+    expect(u.total_tokens).toBe(120);
+    expect(u.prompt_tokens_details.cached_tokens).toBe(80);
+    expect(u.prompt_tokens_details.cache_creation_tokens).toBe(10);
+    expect(u.completion_tokens_details.reasoning_tokens).toBe(5);
+  });
+
   it("unknown kind / null raw -> null", () => {
     expect(toOpenAIUsage({}, "nope")).toBeNull();
     expect(toOpenAIUsage(null, "claude")).toBeNull();
