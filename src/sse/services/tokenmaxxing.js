@@ -33,3 +33,13 @@ export async function resolveTokenmaxxingOrder(models, log) {
   log?.info("COMBO", `tokenmaxxing scores: ${JSON.stringify(scores)}`);
   return orderByScore(models, scores);
 }
+
+// Connection with the highest known positive score for a provider (cached), else null.
+export async function bestConnectionId(provider) {
+  let best = null, top = 0;
+  for (const c of await getProviderConnections({ provider, isActive: true })) {
+    const s = await connScore(c);
+    if (s != null && s > top) { top = s; best = c.id; }
+  }
+  return best;
+}
