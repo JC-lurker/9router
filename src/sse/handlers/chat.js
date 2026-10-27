@@ -28,7 +28,7 @@ import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 import { stripModelContextMarker } from "open-sse/utils/modelMarkers.js";
 import { getKeyAccessContext, enforceKeyAccess, filterAdapterModels } from "../services/keyAccess.js";
 import { resolveSmartChoice } from "../services/systemoneRouter.js";
-import { resolveTokenmaxxingOrder } from "../services/tokenmaxxing.js";
+import { resolveTokenmaxxingOrder, bestConnectionId } from "../services/tokenmaxxing.js";
 
 /**
  * Handle chat completion request
@@ -144,7 +144,7 @@ export async function handleChat(request, clientRawRequest = null) {
       body,
       models: augmentedModels,
       handleSingleModel: withCapacityAdapterStripping(
-        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
+        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, null, comboStrategy === "tokenmaxxing"),
         adapterAdded
       ),
       log,
@@ -192,7 +192,7 @@ export async function handleChat(request, clientRawRequest = null) {
 /**
  * Handle single model chat request
  */
-async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null, requestedModel = null) {
+async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null, requestedModel = null, pinBest = false) {
   const modelInfo = await getModelInfo(modelStr);
 
   // If provider is null, this might be a combo name - check and handle
@@ -240,7 +240,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
         body,
         models: augmentedModels,
         handleSingleModel: withCapacityAdapterStripping(
-          (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
+          (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, null, comboStrategy === "tokenmaxxing"),
           adapterAdded
         ),
         log,
@@ -279,8 +279,11 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   let lastStatus = null;
   let lastHeaders = null;
 
+  // Tokenmaxxing: prefer the account with most allowance whenever an account is picked (sticky limit still honored).
+  const pinned = pinBest ? await bestConnectionId(provider) : null;
+
   while (true) {
-    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model, { requestedModel: requestedModel || model });
+    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model, { requestedModel: requestedModel || model, preferBestConnectionId: excludeConnectionIds.size ? null : pinned });
 
     // All accounts unavailable
     if (!credentials || credentials.allRateLimited) {
