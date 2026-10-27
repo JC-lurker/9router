@@ -15,6 +15,10 @@ describe("tokenmaxxing", () => {
     const b = scoreQuotas([{ name: "Monthly", remainingPercentage: 97, resetAt: h(624) }], now);
     expect(a).toBeGreaterThan(b);
   });
+  it("derives % from used/total when remainingPercentage missing", () => {
+    expect(scoreQuotas([{ name: "Monthly", used: 12, total: 100, resetAt: h(96) }], now)).toBeCloseTo(22, 0);
+    expect(scoreQuotas([{ name: "Monthly", used: 100, total: 100, resetAt: h(96) }], now)).toBe(0);
+  });
   it("order: known desc, unknown mid, exhausted last", () => {
     expect(orderByScore(["a", "b", "c", "d"], { a: 0, b: 5, c: null, d: 9 })).toEqual(["d", "b", "c", "a"]);
   });

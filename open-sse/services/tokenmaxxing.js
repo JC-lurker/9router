@@ -9,10 +9,18 @@ export function pickAnchor(quotas) {
   return q.find((x) => /month/i.test(x.name)) || q.sort((a, b) => new Date(b.resetAt) - new Date(a.resetAt))[0] || null;
 }
 
+// Many providers (CodeBuddy, Kiro, ...) report only used/total, not remainingPercentage.
+function withPct(q) {
+  if (!q || Number.isFinite(q.remainingPercentage)) return q;
+  const used = Number(q.used), total = Number(q.total);
+  if (!(total > 0) || !Number.isFinite(used)) return q;
+  return { ...q, remainingPercentage: Math.max(0, ((total - used) / total) * 100) };
+}
+
 // quotas: [{ name, remainingPercentage, resetAt, unlimited }] -> score (higher = route first), null = unknown.
 // Any exhausted finite quota (0%) blocks the account -> 0. Else anchor %-left per day until reset.
 export function scoreQuotas(quotas, now = Date.now()) {
-  const finite = (quotas || []).filter((q) => q && !q.unlimited && Number.isFinite(q.remainingPercentage));
+  const finite = (quotas || []).map(withPct).filter((q) => q && !q.unlimited && Number.isFinite(q.remainingPercentage));
   if (!finite.length) return null;
   if (finite.some((q) => q.remainingPercentage <= 0)) return 0;
   const anchor = pickAnchor(finite);
