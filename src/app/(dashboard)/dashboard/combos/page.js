@@ -51,6 +51,7 @@ const STRATEGY_OPTIONS = [
   { value: "fallback", label: "Fallback — try in order" },
   { value: "round-robin", label: "Round Robin — rotate" },
   { value: "smart", label: "Smart Router — System One" },
+  { value: "tokenmaxxing", label: "Tokenmaxxing — most quota left per day" },
   { value: "fusion", label: "Fusion — panel + judge" },
 ];
 
