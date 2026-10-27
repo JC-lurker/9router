@@ -279,11 +279,11 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   let lastStatus = null;
   let lastHeaders = null;
 
-  // Tokenmaxxing: first try the account with most allowance, bypassing round-robin.
+  // Tokenmaxxing: prefer the account with most allowance whenever an account is picked (sticky limit still honored).
   const pinned = pinBest ? await bestConnectionId(provider) : null;
 
   while (true) {
-    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model, { requestedModel: requestedModel || model, preferredConnectionId: excludeConnectionIds.size ? null : pinned });
+    const credentials = await getProviderCredentials(provider, excludeConnectionIds, model, { requestedModel: requestedModel || model, preferBestConnectionId: excludeConnectionIds.size ? null : pinned });
 
     // All accounts unavailable
     if (!credentials || credentials.allRateLimited) {
