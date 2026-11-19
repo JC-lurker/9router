@@ -40,29 +40,12 @@ const ANTIGRAVITY_TRANSIENT_STATUSES = new Set([
 ]);
 
 // Rewrite competing-client prompt signatures in system prompts (e.g. Zed's Claude prompt,
-// OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted.
-// Applied to every systemInstruction part, including prompts a client replays from its own
-// session — not only an injected persona.
-function applyPromptRewrites(text) {
-  let out = text;
-  for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) out = out.replaceAll(from, to);
-  return out;
-}
-
+// OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted. Every
+// systemInstruction part is rewritten, including prompts a client replays from its own session.
 function rewriteSystemPrompts(request) {
-  for (const key of ["systemInstruction", "system_instruction"]) {
-    const system = request[key];
-    if (!system) continue;
-    if (typeof system === "string") {
-      request[key] = applyPromptRewrites(system);
-      continue;
-    }
-    if (typeof system.text === "string") system.text = applyPromptRewrites(system.text);
-    if (Array.isArray(system.parts)) {
-      for (const part of system.parts) {
-        if (part && typeof part.text === "string") part.text = applyPromptRewrites(part.text);
-      }
-    }
+  for (const part of request.systemInstruction?.parts || []) {
+    if (typeof part?.text !== "string") continue;
+    for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) part.text = part.text.replaceAll(from, to);
   }
 }
 
@@ -327,9 +310,6 @@ export class AntigravityExecutor extends BaseExecutor {
     // Strip tools/toolConfig (handled separately) and blacklisted fields that Google rejects
     const { tools: _originalTools, toolConfig: _originalToolConfig, ...requestWithoutTools } = body.request || {};
     stripBlacklisted(requestWithoutTools);
-    
-    // Rewrite competing-client branding in system prompts (e.g. Zed's Claude prompt,
-    // OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted.
     rewriteSystemPrompts(requestWithoutTools);
 
     const generationConfig = { ...(requestWithoutTools.generationConfig || {}) };

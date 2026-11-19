@@ -58,4 +58,10 @@ describe("Antigravity rewrites the #5695 system prompt phrase", () => {
     const text = systemTextSentToAntigravity("gemini-3.8-flash-high", prompt);
     expect(text).toBe(prompt);
   });
+
+  it("does not match the phrase inside a longer word like 'resolve coding tasks.'", () => {
+    const prompt = "You help users resolve coding tasks. Be concise, practical, and tool-aware.";
+    const text = systemTextSentToAntigravity("gemini-3.8-flash-high", prompt);
+    expect(text).toBe(prompt);
+  });
 });
