@@ -39,6 +39,33 @@ const ANTIGRAVITY_TRANSIENT_STATUSES = new Set([
   HTTP_STATUS.GATEWAY_TIMEOUT,
 ]);
 
+// Rewrite competing-client prompt signatures in system prompts (e.g. Zed's Claude prompt,
+// OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted.
+// Applied to every systemInstruction part, including prompts a client replays from its own
+// session — not only an injected persona.
+function applyPromptRewrites(text) {
+  let out = text;
+  for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) out = out.replaceAll(from, to);
+  return out;
+}
+
+function rewriteSystemPrompts(request) {
+  for (const key of ["systemInstruction", "system_instruction"]) {
+    const system = request[key];
+    if (!system) continue;
+    if (typeof system === "string") {
+      request[key] = applyPromptRewrites(system);
+      continue;
+    }
+    if (typeof system.text === "string") system.text = applyPromptRewrites(system.text);
+    if (Array.isArray(system.parts)) {
+      for (const part of system.parts) {
+        if (part && typeof part.text === "string") part.text = applyPromptRewrites(part.text);
+      }
+    }
+  }
+}
+
 // Fields Google generateContent rejects (Claude/OpenAI/Qwen thinking fields set at body root by thinkingUnified.js)
 const ANTIGRAVITY_REQUEST_BLACKLIST = [
   "output_config",
@@ -303,14 +330,7 @@ export class AntigravityExecutor extends BaseExecutor {
     
     // Rewrite competing-client branding in system prompts (e.g. Zed's Claude prompt,
     // OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted.
-    if (requestWithoutTools.systemInstruction?.parts) {
-      for (const part of requestWithoutTools.systemInstruction.parts) {
-        if (typeof part.text !== "string") continue;
-        for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) {
-          part.text = part.text.replaceAll(from, to);
-        }
-      }
-    }
+    rewriteSystemPrompts(requestWithoutTools);
 
     const generationConfig = { ...(requestWithoutTools.generationConfig || {}) };
     if (generationConfig.maxOutputTokens > MAX_ANTIGRAVITY_OUTPUT_TOKENS) {

@@ -191,6 +191,15 @@ export const ANTIGRAVITY_PROMPT_REWRITES = [
   // but OpenAI-format clients (e.g. proxies that convert Claude Code to /v1/chat/completions)
   // pass it through, and any system text containing it gets a fake 429 RESOURCE_EXHAUSTED.
   { from: /^x-anthropic-billing-header:[^\n]*(?:\r?\n)*/gim, to: "" },
+  // #5695: this sentence pair in systemInstruction is flagged and answered with a detail-free
+  // 429 RESOURCE_EXHAUSTED even when quota is available. Rewording the pair restores 200 across
+  // the Gemini, Claude and GPT-OSS models Antigravity serves. The sentence terminator and the
+  // whitespace between the sentences are matched loosely because the newline-separated variant
+  // is rejected as well.
+  {
+    from: /solve coding tasks[.,!;:]?\s*Be concise, practical, and tool-aware\./gi,
+    to: "work on their coding tasks. Keep responses concise and practical, and use the available tools when they help.",
+  },
   { from: /opencode/gi, to: (m) => (m === "OpenCode" ? "Antigravity" : m === "OPENCODE" ? "ANTIGRAVITY" : "antigravity") }
 ];
 
