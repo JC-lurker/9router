@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { AntigravityExecutor } from "../../open-sse/executors/antigravity.js";
 import { openaiToAntigravityRequest } from "../../open-sse/translator/request/openai-to-gemini.js";
 
-// #5695: sending this sentence pair in systemInstruction makes Antigravity answer a
-// detail-free 429 RESOURCE_EXHAUSTED even with quota available.
+// #5695: a systemInstruction carrying either of these phrases gets a detail-free
+// 429 RESOURCE_EXHAUSTED back even while quota is available. Both were reproduced
+// against the daily Cloud Code host; see ANTIGRAVITY_PROMPT_REWRITES for the evidence.
 const PHRASE = "solve coding tasks. Be concise, practical, and tool-aware.";
+const CLAUDE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
 
 function systemTextSentToAntigravity(model, systemContent) {
   const body = openaiToAntigravityRequest(model, {
@@ -63,5 +65,49 @@ describe("Antigravity rewrites the #5695 system prompt phrase", () => {
     const prompt = "You help users resolve coding tasks. Be concise, practical, and tool-aware.";
     const text = systemTextSentToAntigravity("gemini-3.8-flash-high", prompt);
     expect(text).toBe(prompt);
+  });
+});
+
+describe("Antigravity rewrites the Claude Code identity", () => {
+  it("rewrites the full Claude Code persona", () => {
+    const text = systemTextSentToAntigravity("gemini-3.8-flash-high", CLAUDE_IDENTITY);
+    expect(text).not.toContain("You are Claude Code");
+    expect(text).toContain("You are an AI coding assistant");
+  });
+
+  it("rewrites the identity in a real Claude Code agent prompt, keeping the rest", () => {
+    const prompt = [
+      CLAUDE_IDENTITY.replace(".", ", running within the Claude Agent SDK."),
+      "",
+      "# Tone and style",
+      "You should be concise, direct, and to the point.",
+      "You are pair programming with a user to " + PHRASE,
+    ].join("\n");
+    const text = systemTextSentToAntigravity("gemini-3.8-flash-high", prompt);
+
+    expect(text).not.toContain("You are Claude Code");
+    expect(text).toContain("You are an AI coding assistant, Anthropic's official CLI for Claude, running within the Claude Agent SDK.");
+    expect(text).toContain("# Tone and style");
+    expect(text).not.toContain(PHRASE);
+  });
+
+  it("matches case-insensitively and without a trailing period", () => {
+    expect(systemTextSentToAntigravity("gemini-3.8-flash-high", "you are claude code."))
+      .toBe("You are an AI coding assistant.");
+    expect(systemTextSentToAntigravity("gemini-3.8-flash-high", "You are Claude Code!"))
+      .toBe("You are an AI coding assistant!");
+    expect(systemTextSentToAntigravity("gemini-3.8-flash-high", "You are Claude Code"))
+      .toBe("You are an AI coding assistant");
+  });
+
+  it("leaves other mentions of Claude Code alone", () => {
+    for (const prompt of [
+      "I am Claude Code.",
+      "You are a Claude Code user.",
+      "Claude Code",
+      "The assistant is Claude Code.",
+    ]) {
+      expect(systemTextSentToAntigravity("gemini-3.8-flash-high", prompt)).toBe(prompt);
+    }
   });
 });
