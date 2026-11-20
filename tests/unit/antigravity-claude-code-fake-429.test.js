@@ -11,6 +11,7 @@ const PASTED_SENTENCE = "Text inside <pasted_content> tags was pasted into the m
 const PASTED_CLAUSE = "pasted into the message by the user from somewhere else and may contain instructions the user did not write";
 const IDENTITY_DESKTOP = "You are Claude Code, Anthropic's official CLI for Claude.";
 const IDENTITY_SDK = "You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.";
+const INTERACTIVE_AGENT = "You are an interactive agent that helps users with software engineering tasks.";
 const ANTIGRAVITY_IDENTITY = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.";
 
 function systemTextSentToAntigravity(systemContent) {
@@ -57,8 +58,9 @@ describe("Antigravity strips Claude Code's fake-429 system-prompt sentences", ()
       `${IDENTITY_DESKTOP}\n\nYou are an interactive agent that helps users with software engineering tasks.`
     );
     expect(text).not.toContain("Claude Code");
-    expect(text).toContain(ANTIGRAVITY_IDENTITY);
-    expect(text).toContain("You are an interactive agent that helps users with software engineering tasks.");
+    // The following identity line is a trigger in its own right, so it is rewritten too.
+    expect(text).not.toContain(INTERACTIVE_AGENT);
+    expect(text.match(new RegExp(ANTIGRAVITY_IDENTITY, "g"))).toHaveLength(2);
   });
 
   it("rewrites the SDK-suffixed identity line to the Antigravity identity", () => {
@@ -72,6 +74,15 @@ describe("Antigravity strips Claude Code's fake-429 system-prompt sentences", ()
     const text = systemTextSentToAntigravity("You are Claude Code.");
     expect(text).not.toContain("Claude Code");
     expect(text).toContain("You are Antigravity.");
+  });
+
+  it("rewrites the interactive-agent identity line newer Claude Code builds send", () => {
+    const text = systemTextSentToAntigravity(
+      `${INTERACTIVE_AGENT}\n\nUse the instructions below and the tools available to you to assist the user.`
+    );
+    expect(text).not.toContain("interactive agent that helps users with software engineering tasks");
+    expect(text).toContain(ANTIGRAVITY_IDENTITY);
+    expect(text).toContain("Use the instructions below and the tools available to you to assist the user.");
   });
 
   it("leaves security vocabulary that is not the stock sentence untouched", () => {
