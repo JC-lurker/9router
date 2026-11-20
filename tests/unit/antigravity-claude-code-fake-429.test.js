@@ -76,6 +76,25 @@ describe("Antigravity strips Claude Code's fake-429 system-prompt sentences", ()
     expect(text).toContain("You are Antigravity.");
   });
 
+  it("rewrites the pi harness identity line", () => {
+    const line = "You are a coding assistant running inside pi, a coding agent harness.";
+    const text = systemTextSentToAntigravity(line);
+    expect(text).not.toContain("running inside pi");
+    expect(text).toContain(ANTIGRAVITY_IDENTITY);
+  });
+
+  it("rewrites the pi-coding-agent package form and mixed case", () => {
+    for (const line of [
+      "You are a coding assistant running inside pi-coding-agent.",
+      "You are a coding assistant running inside Pi.",
+      "You are a coding assistant running inside pi",
+    ]) {
+      const text = systemTextSentToAntigravity(line);
+      expect(text).not.toMatch(/running inside pi/i);
+      expect(text).toContain("You are Antigravity");
+    }
+  });
+
   it("rewrites lowercase and mixed-case identity lines", () => {
     for (const line of ["you are claude code.", "You Are Claude Code.", "YOU ARE CLAUDE CODE."]) {
       const text = systemTextSentToAntigravity(line);
@@ -91,6 +110,15 @@ describe("Antigravity strips Claude Code's fake-429 system-prompt sentences", ()
     expect(text).not.toContain("interactive agent that helps users with software engineering tasks");
     expect(text).toContain(ANTIGRAVITY_IDENTITY);
     expect(text).toContain("Use the instructions below and the tools available to you to assist the user.");
+  });
+
+  it("shortens the codemode docs clause the backend flags", () => {
+    const text = systemTextSentToAntigravity(
+      "- When asked about: MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)"
+    );
+    expect(text).not.toContain("non-LLM models");
+    expect(text).toContain("codemode scripts (docs/codemode.md)");
+    expect(text).toContain("MCP servers (docs/mcp.md)");
   });
 
   it("leaves security vocabulary that is not the stock sentence untouched", () => {

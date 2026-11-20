@@ -227,6 +227,18 @@ export const ANTIGRAVITY_PROMPT_REWRITES = [
   // below..." sentence all return 200. Rewrite it to the same Antigravity identity
   // the rules above use, so the prompt keeps an identity line.
   { from: /You are an interactive agent that helps users with software engineering tasks\./gi, to: ANTIGRAVITY_IDENTITY },
+  // Fifth trigger, measured on the live instance: the identity line this harness
+  // (pi) opens its system prompt with. Antigravity flags a request that names a
+  // competing agent harness, so `You are a coding assistant running inside pi.`
+  // returns 429 while the same sentence naming Cursor, or naming no harness,
+  // returns 200. The match is case-insensitive and covers the `pi-coding-agent`
+  // package name plus the sentence's trailing period.
+  { from: /\byou are(?: a| an)?[^.\n]{0,80}?running inside pi(?:-coding-agent)?\b[^.\n]*\.?/gi, to: ANTIGRAVITY_IDENTITY },
+  // Same harness prompt, second measured trigger: the docs line naming pi's
+  // codemode feature. The full clause returns 429 while the shortened form
+  // "codemode scripts (docs/codemode.md)" returns 200, so keep the reference and
+  // drop the clause the backend flags.
+  { from: "codemode scripts and non-LLM models such as classifiers and image models", to: "codemode scripts" },
   { from: /opencode/gi, to: (m) => (m === "OpenCode" ? "Antigravity" : m === "OPENCODE" ? "ANTIGRAVITY" : "antigravity") }
 ];
 
