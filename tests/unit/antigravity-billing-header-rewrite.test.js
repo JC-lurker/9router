@@ -21,7 +21,10 @@ describe("Antigravity strips the Claude Code billing header from system prompts"
   it("removes the header line prepended by Claude Code", () => {
     const text = systemTextSentToAntigravity(`${HEADER}\n\nYou are Claude Code, Anthropic's official CLI for Claude.`);
     expect(text).not.toContain("x-anthropic-billing-header");
-    expect(text).toContain("You are Claude Code, Anthropic's official CLI for Claude.");
+    // The Claude Code identity is itself a 429 trigger on Antigravity (see
+    // antigravity-prompt-phrase-rewrite.test.js), so it is rewritten along with the header.
+    expect(text).not.toContain("You are Claude Code");
+    expect(text).toContain("You are an AI coding assistant, Anthropic's official CLI for Claude.");
   });
 
   it("removes the header when it is not the first line", () => {

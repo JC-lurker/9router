@@ -200,6 +200,12 @@ export const ANTIGRAVITY_PROMPT_REWRITES = [
     from: /\bsolve coding tasks[.,!;:]?\s*Be concise, practical, and tool-aware\./gi,
     to: "work on their coding tasks. Keep responses concise and practical, and use the available tools when they help.",
   },
+  // #5695 follow-up: the Claude Code identity alone also gets the same detail-free 429. Verified
+  // against the daily Cloud Code host: `You are Claude Code` (with or without a trailing period,
+  // in any case) is rejected, while `Claude Code` on its own, `I am Claude Code.` and
+  // `You are a Claude Code user.` pass. Only the leading identity is rewritten, so a prompt that
+  // merely mentions Claude Code elsewhere keeps its text.
+  { from: /\byou are claude code\b/gi, to: "You are an AI coding assistant" },
   { from: /opencode/gi, to: (m) => (m === "OpenCode" ? "Antigravity" : m === "OPENCODE" ? "ANTIGRAVITY" : "antigravity") }
 ];
 
