@@ -76,6 +76,14 @@ describe("Antigravity strips Claude Code's fake-429 system-prompt sentences", ()
     expect(text).toContain("You are Antigravity.");
   });
 
+  it("rewrites lowercase and mixed-case identity lines", () => {
+    for (const line of ["you are claude code.", "You Are Claude Code.", "YOU ARE CLAUDE CODE."]) {
+      const text = systemTextSentToAntigravity(line);
+      expect(text).not.toMatch(/claude code/i);
+      expect(text).toContain("You are Antigravity");
+    }
+  });
+
   it("rewrites the interactive-agent identity line newer Claude Code builds send", () => {
     const text = systemTextSentToAntigravity(
       `${INTERACTIVE_AGENT}\n\nUse the instructions below and the tools available to you to assist the user.`

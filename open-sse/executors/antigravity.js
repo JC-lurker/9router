@@ -39,6 +39,16 @@ const ANTIGRAVITY_TRANSIENT_STATUSES = new Set([
   HTTP_STATUS.GATEWAY_TIMEOUT,
 ]);
 
+// Rewrite competing-client prompt signatures in system prompts (e.g. Zed's Claude prompt,
+// OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted. Every
+// systemInstruction part is rewritten, including prompts a client replays from its own session.
+function rewriteSystemPrompts(request) {
+  for (const part of request.systemInstruction?.parts || []) {
+    if (typeof part?.text !== "string") continue;
+    for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) part.text = part.text.replaceAll(from, to);
+  }
+}
+
 // Fields Google generateContent rejects (Claude/OpenAI/Qwen thinking fields set at body root by thinkingUnified.js)
 const ANTIGRAVITY_REQUEST_BLACKLIST = [
   "output_config",
@@ -300,17 +310,7 @@ export class AntigravityExecutor extends BaseExecutor {
     // Strip tools/toolConfig (handled separately) and blacklisted fields that Google rejects
     const { tools: _originalTools, toolConfig: _originalToolConfig, ...requestWithoutTools } = body.request || {};
     stripBlacklisted(requestWithoutTools);
-    
-    // Rewrite competing-client branding in system prompts (e.g. Zed's Claude prompt,
-    // OpenCode naming) so Antigravity doesn't flag the request with a 429 Quota Exhausted.
-    if (requestWithoutTools.systemInstruction?.parts) {
-      for (const part of requestWithoutTools.systemInstruction.parts) {
-        if (typeof part.text !== "string") continue;
-        for (const { from, to } of ANTIGRAVITY_PROMPT_REWRITES) {
-          part.text = part.text.replaceAll(from, to);
-        }
-      }
-    }
+    rewriteSystemPrompts(requestWithoutTools);
 
     const generationConfig = { ...(requestWithoutTools.generationConfig || {}) };
     if (generationConfig.maxOutputTokens > MAX_ANTIGRAVITY_OUTPUT_TOKENS) {
